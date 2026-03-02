@@ -1,11 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
+  ExtractedIdentifier,
   extractLinearIssueIdentifiersForCommit,
   extractPullRequestNumbersForCommit,
+  extractRevertedIssueIdentifiersForCommit,
   getRevertBranchDepth,
   getRevertMessageDepth,
 } from "./extractors";
 import { CommitContext } from "./types";
+
+function ids(result: ExtractedIdentifier[]): string[] {
+  return result.map((r) => r.identifier);
+}
 
 describe("extractLinearIssueIdentifiersForCommit", () => {
   it("extracts identifiers from branch name", () => {
@@ -17,7 +23,7 @@ describe("extractLinearIssueIdentifiersForCommit", () => {
 
     const result = extractLinearIssueIdentifiersForCommit(commit);
 
-    expect(result).toEqual(["ENG-123"]);
+    expect(ids(result)).toEqual(["ENG-123"]);
   });
 
   it("extracts identifiers from commit message with magic words", () => {
@@ -29,7 +35,7 @@ describe("extractLinearIssueIdentifiersForCommit", () => {
 
     const result = extractLinearIssueIdentifiersForCommit(commit);
 
-    expect(result.sort()).toEqual(["ENG-7", "PLAT-42"].sort());
+    expect(ids(result).sort()).toEqual(["ENG-7", "PLAT-42"].sort());
   });
 
   it("deduplicates identifiers across branch and message (case-insensitive)", () => {
@@ -41,7 +47,7 @@ describe("extractLinearIssueIdentifiersForCommit", () => {
 
     const result = extractLinearIssueIdentifiersForCommit(commit);
 
-    expect(result).toEqual(["ENG-123"]);
+    expect(ids(result)).toEqual(["ENG-123"]);
   });
 
   it("returns empty array when no identifiers are present", () => {
@@ -53,7 +59,7 @@ describe("extractLinearIssueIdentifiersForCommit", () => {
 
     const result = extractLinearIssueIdentifiersForCommit(commit);
 
-    expect(result).toEqual([]);
+    expect(ids(result)).toEqual([]);
   });
 
   it("matches team keys with 1-7 alphanumeric characters", () => {
@@ -65,7 +71,7 @@ describe("extractLinearIssueIdentifiersForCommit", () => {
 
     const result = extractLinearIssueIdentifiersForCommit(commit);
 
-    expect(result.sort()).toEqual(["A-1", "ABCDEFG-999", "X1Y2Z3A-100"].sort());
+    expect(ids(result).sort()).toEqual(["A-1", "ABCDEFG-999", "X1Y2Z3A-100"].sort());
   });
 
   it("does not extract identifiers from commit message without magic words", () => {
@@ -77,7 +83,7 @@ describe("extractLinearIssueIdentifiersForCommit", () => {
 
     const result = extractLinearIssueIdentifiersForCommit(commit);
 
-    expect(result).toEqual([]);
+    expect(ids(result)).toEqual([]);
   });
 
   it("does not match team keys longer than 7 characters", () => {
@@ -89,7 +95,7 @@ describe("extractLinearIssueIdentifiersForCommit", () => {
 
     const result = extractLinearIssueIdentifiersForCommit(commit);
 
-    expect(result).toEqual([]);
+    expect(ids(result)).toEqual([]);
   });
 });
 
@@ -108,7 +114,7 @@ describe("version suffix handling", () => {
       branchName: branch,
       message: null,
     });
-    expect(result).toEqual(expected);
+    expect(ids(result)).toEqual(expected);
   });
 
   // Legitimate identifiers should match
@@ -125,7 +131,7 @@ describe("version suffix handling", () => {
       branchName: branch,
       message: null,
     });
-    expect(result).toEqual(expected);
+    expect(ids(result)).toEqual(expected);
   });
 });
 
@@ -136,7 +142,7 @@ describe("leading zero rejection", () => {
       branchName: "feature/LIN-0004-test",
       message: null,
     });
-    expect(result).toEqual([]);
+    expect(ids(result)).toEqual([]);
   });
 });
 
@@ -150,7 +156,7 @@ describe("underscore handling", () => {
       branchName: branch,
       message: null,
     });
-    expect(result).toEqual(expected);
+    expect(ids(result)).toEqual(expected);
   });
 });
 
@@ -164,7 +170,7 @@ describe("multiple identifiers", () => {
       branchName: null,
       message,
     });
-    expect(result.sort()).toEqual(expected.sort());
+    expect(ids(result).sort()).toEqual(expected.sort());
   });
 });
 
@@ -175,7 +181,7 @@ describe("commit message magic word behavior", () => {
       branchName: null,
       message: "Fixes LIN-123",
     });
-    expect(result).toEqual(["LIN-123"]);
+    expect(ids(result)).toEqual(["LIN-123"]);
   });
 
   it("extracts with contributing phrase", () => {
@@ -184,7 +190,7 @@ describe("commit message magic word behavior", () => {
       branchName: null,
       message: "Related to LIN-123",
     });
-    expect(result).toEqual(["LIN-123"]);
+    expect(ids(result)).toEqual(["LIN-123"]);
   });
 
   it("does not extract without magic words", () => {
@@ -193,7 +199,7 @@ describe("commit message magic word behavior", () => {
       branchName: null,
       message: "See LIN-123 for details",
     });
-    expect(result).toEqual([]);
+    expect(ids(result)).toEqual([]);
   });
 
   it("extracts multiple keys after keyword", () => {
@@ -202,7 +208,7 @@ describe("commit message magic word behavior", () => {
       branchName: null,
       message: "Fixes LIN-123, LIN-456 and ENG-789",
     });
-    expect(result.sort()).toEqual(["ENG-789", "LIN-123", "LIN-456"]);
+    expect(ids(result).sort()).toEqual(["ENG-789", "LIN-123", "LIN-456"]);
   });
 
   it("extracts magic word in title line", () => {
@@ -211,7 +217,7 @@ describe("commit message magic word behavior", () => {
       branchName: null,
       message: "Fix LIN-123: something",
     });
-    expect(result).toEqual(["LIN-123"]);
+    expect(ids(result)).toEqual(["LIN-123"]);
   });
 
   it("does not extract key in title without keyword", () => {
@@ -220,7 +226,7 @@ describe("commit message magic word behavior", () => {
       branchName: null,
       message: "LIN-123: Fix something",
     });
-    expect(result).toEqual([]);
+    expect(ids(result)).toEqual([]);
   });
 
   it.each([
@@ -246,7 +252,7 @@ describe("commit message magic word behavior", () => {
       branchName: null,
       message: `${keyword} LIN-100`,
     });
-    expect(result).toEqual(["LIN-100"]);
+    expect(ids(result)).toEqual(["LIN-100"]);
   });
 
   it.each(["ref", "refs", "references", "part of", "related to", "relates to", "contributes to", "towards", "toward"])(
@@ -257,7 +263,7 @@ describe("commit message magic word behavior", () => {
         branchName: null,
         message: `${phrase} LIN-200`,
       });
-      expect(result).toEqual(["LIN-200"]);
+      expect(ids(result)).toEqual(["LIN-200"]);
     },
   );
 
@@ -267,7 +273,7 @@ describe("commit message magic word behavior", () => {
       branchName: null,
       message: "Closes: LIN-123",
     });
-    expect(result).toEqual(["LIN-123"]);
+    expect(ids(result)).toEqual(["LIN-123"]);
   });
 
   it("only extracts keys preceded by magic word on same line", () => {
@@ -276,7 +282,7 @@ describe("commit message magic word behavior", () => {
       branchName: null,
       message: "See LIN-111, fixes LIN-222",
     });
-    expect(result).toEqual(["LIN-222"]);
+    expect(ids(result)).toEqual(["LIN-222"]);
   });
 
   it("does not extract from the original bug scenario", () => {
@@ -285,7 +291,7 @@ describe("commit message magic word behavior", () => {
       branchName: null,
       message: "Title\nSeparate issue to follow up on that here LIN-60064",
     });
-    expect(result).toEqual([]);
+    expect(ids(result)).toEqual([]);
   });
 
   it("branch provides keys independently of message magic words", () => {
@@ -294,7 +300,7 @@ describe("commit message magic word behavior", () => {
       branchName: "feature/LIN-100-something",
       message: "See LIN-200 for details",
     });
-    expect(result).toEqual(["LIN-100"]);
+    expect(ids(result)).toEqual(["LIN-100"]);
   });
 
   it("is case insensitive for magic words", () => {
@@ -303,7 +309,7 @@ describe("commit message magic word behavior", () => {
       branchName: null,
       message: "fIXES LIN-123",
     });
-    expect(result).toEqual(["LIN-123"]);
+    expect(ids(result)).toEqual(["LIN-123"]);
   });
 
   it("extracts with multi-word phrase 'Part of'", () => {
@@ -312,7 +318,7 @@ describe("commit message magic word behavior", () => {
       branchName: null,
       message: "Part of LIN-123",
     });
-    expect(result).toEqual(["LIN-123"]);
+    expect(ids(result)).toEqual(["LIN-123"]);
   });
 
   it("extracts with multi-word phrase 'Related to'", () => {
@@ -321,7 +327,7 @@ describe("commit message magic word behavior", () => {
       branchName: null,
       message: "Related to LIN-456",
     });
-    expect(result).toEqual(["LIN-456"]);
+    expect(ids(result)).toEqual(["LIN-456"]);
   });
 
   it("extracts issue from Linear URL with slug after magic word", () => {
@@ -330,7 +336,7 @@ describe("commit message magic word behavior", () => {
       branchName: null,
       message: "Fixes https://linear.app/myorg/issue/LIN-123/fix-auth",
     });
-    expect(result).toEqual(["LIN-123"]);
+    expect(ids(result)).toEqual(["LIN-123"]);
   });
 
   it("extracts issue from Linear URL without slug after magic word", () => {
@@ -339,7 +345,7 @@ describe("commit message magic word behavior", () => {
       branchName: null,
       message: "Fixes https://linear.app/myorg/issue/LIN-123",
     });
-    expect(result).toEqual(["LIN-123"]);
+    expect(ids(result)).toEqual(["LIN-123"]);
   });
 
   it("does not extract Linear URL without magic word", () => {
@@ -348,7 +354,7 @@ describe("commit message magic word behavior", () => {
       branchName: null,
       message: "See https://linear.app/myorg/issue/LIN-123/fix",
     });
-    expect(result).toEqual([]);
+    expect(ids(result)).toEqual([]);
   });
 
   it("extracts mixed Linear URLs and raw IDs after magic word", () => {
@@ -357,7 +363,7 @@ describe("commit message magic word behavior", () => {
       branchName: null,
       message: "Fixes https://linear.app/myorg/issue/LIN-123/slug, ENG-456 and LIN-789",
     });
-    expect(result.sort()).toEqual(["ENG-456", "LIN-123", "LIN-789"]);
+    expect(ids(result).sort()).toEqual(["ENG-456", "LIN-123", "LIN-789"]);
   });
 
   it("extracts issue from http Linear URL after magic word", () => {
@@ -366,7 +372,7 @@ describe("commit message magic word behavior", () => {
       branchName: null,
       message: "Fixes http://linear.app/myorg/issue/LIN-123",
     });
-    expect(result).toEqual(["LIN-123"]);
+    expect(ids(result)).toEqual(["LIN-123"]);
   });
 
   it("extracts issue from Linear URL with trailing slash", () => {
@@ -375,7 +381,7 @@ describe("commit message magic word behavior", () => {
       branchName: null,
       message: "Fixes https://linear.app/my-org/issue/LIN-213/",
     });
-    expect(result).toEqual(["LIN-213"]);
+    expect(ids(result)).toEqual(["LIN-213"]);
   });
 
   it("extracts issue from Linear URL with contributing phrase", () => {
@@ -384,7 +390,7 @@ describe("commit message magic word behavior", () => {
       branchName: null,
       message: "Part of https://linear.app/myorg/issue/LIN-213/some-slug",
     });
-    expect(result).toEqual(["LIN-213"]);
+    expect(ids(result)).toEqual(["LIN-213"]);
   });
 });
 
@@ -395,7 +401,7 @@ describe("revert branch handling", () => {
       branchName: "revert-571-romain/bac-39",
       message: "Merge pull request #572 from org/revert-571-romain/bac-39",
     });
-    expect(result).toEqual([]);
+    expect(ids(result)).toEqual([]);
   });
 
   it("blocks extraction when revert branch has multiple identifiers", () => {
@@ -404,7 +410,7 @@ describe("revert branch handling", () => {
       branchName: "revert-571-romain/drive-320-and-drive-321",
       message: null,
     });
-    expect(result).toEqual([]);
+    expect(ids(result)).toEqual([]);
   });
 
   it("blocks PR number extraction from revert branch", () => {
@@ -422,7 +428,16 @@ describe("revert branch handling", () => {
       branchName: null,
       message: 'Revert "Fixes ENG-100"',
     });
-    expect(result).toEqual([]);
+    expect(ids(result)).toEqual([]);
+  });
+
+  it("reverted extractor picks up message-only revert with magic word", () => {
+    const result = extractRevertedIssueIdentifiersForCommit({
+      sha: "abc",
+      branchName: null,
+      message: 'Revert "Fixes ENG-100"',
+    });
+    expect(ids(result)).toEqual(["ENG-100"]);
   });
 
   it("allows extraction from revert-of-revert branch (even depth)", () => {
@@ -431,7 +446,73 @@ describe("revert branch handling", () => {
       branchName: "revert-572-revert-571-romain/bac-39",
       message: null,
     });
-    expect(result).toEqual(["BAC-39"]);
+    expect(ids(result)).toEqual(["BAC-39"]);
+  });
+});
+
+describe("extractRevertedIssueIdentifiersForCommit", () => {
+  it("extracts identifier from unwrapped revert message with magic word", () => {
+    const result = extractRevertedIssueIdentifiersForCommit({
+      sha: "abc",
+      message: 'Revert "Fixes DRIVE-320: memory leak in background location service"',
+    });
+    expect(ids(result)).toEqual(["DRIVE-320"]);
+  });
+
+  it("ignores identifier in unwrapped message without magic word", () => {
+    const result = extractRevertedIssueIdentifiersForCommit({
+      sha: "abc",
+      message: 'Revert "DRIVE-320: Fix memory leak in background location service"',
+    });
+    expect(ids(result)).toEqual([]);
+  });
+
+  it("extracts identifier from revert branch name", () => {
+    const result = extractRevertedIssueIdentifiersForCommit({
+      sha: "abc",
+      branchName: "revert-571-romain/bac-39",
+      message: 'Revert "Add TEST variable to .env.example"',
+    });
+    expect(ids(result)).toEqual(["BAC-39"]);
+  });
+
+  it("extracts from both message and branch, deduplicates", () => {
+    const result = extractRevertedIssueIdentifiersForCommit({
+      sha: "abc",
+      branchName: "revert-566-romain/drive-320",
+      message: 'Revert "Fixes DRIVE-320: memory leak"',
+    });
+    expect(ids(result)).toEqual(["DRIVE-320"]);
+  });
+
+  it("extracts multiple identifiers from unwrapped message", () => {
+    const result = extractRevertedIssueIdentifiersForCommit({
+      sha: "abc",
+      message: 'Revert "Fixes DRIVE-320 and DRIVE-321"',
+    });
+    expect(ids(result).sort()).toEqual(["DRIVE-320", "DRIVE-321"]);
+  });
+
+  it("returns empty for non-revert commit", () => {
+    const result = extractRevertedIssueIdentifiersForCommit({
+      sha: "abc",
+      branchName: "romain/drive-320",
+      message: "DRIVE-320: Fix memory leak",
+    });
+    expect(ids(result)).toEqual([]);
+  });
+
+  it("returns empty when revert message has no identifiers", () => {
+    const result = extractRevertedIssueIdentifiersForCommit({
+      sha: "abc",
+      message: 'Revert "Fix bug"',
+    });
+    expect(ids(result)).toEqual([]);
+  });
+
+  it("returns empty for null/undefined inputs", () => {
+    expect(ids(extractRevertedIssueIdentifiersForCommit({ sha: "abc", message: null }))).toEqual([]);
+    expect(ids(extractRevertedIssueIdentifiersForCommit({ sha: "abc" }))).toEqual([]);
   });
 });
 
