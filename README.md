@@ -19,7 +19,7 @@
 </p>
 
 > [!IMPORTANT]
-> Linear Release is in **closed beta**. Contact [Linear support](https://linear.app/contact) or your account manager to request access. APIs and commands may change.
+> Linear Release is in **public beta**. Contact [Linear support](https://linear.app/contact) or your account manager to request access. APIs and commands may change.
 
 ## Overview
 
