@@ -227,13 +227,14 @@ export function ensureCommitAvailable(sha: string, cwd: string = process.cwd()):
   for (const { command, label } of strategies) {
     verbose(label);
     try {
-      execSync(command, { cwd, stdio: "pipe" });
+      execSync(command, { cwd, stdio: ["ignore", "ignore", "pipe"], timeout: 30_000 });
       if (commitExists(sha, cwd)) {
         verbose(`Found commit ${sha}`);
         return;
       }
-    } catch {
-      // Strategy failed, try next
+    } catch (e) {
+      const reason = e instanceof Error ? e.message : String(e);
+      verbose(`Strategy "${label}" failed: ${reason}`);
     }
   }
 
